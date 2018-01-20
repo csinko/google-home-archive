@@ -2,6 +2,7 @@ var SqueezeServer = require('squeezenode');
 var sleep = require('sleep');
 var squeeze = new SqueezeServer('http://localhost', 9000);
 var request = require('request');
+var readline = require('readline');
 
 function playerIdByName(name, callback) {
   var found = false;
@@ -68,15 +69,16 @@ function setAlbum(url) {
 
 }
 
-function getShows(artist) {
+function getShows(artist, callback) {
   url = "https://archive.org/advancedsearch.php"
   query = "collection:" + artist + " AND mediatype:etree";
+  filters = "fl[]=identifier&fl[]=venue&fl[]=date"
 
-  completeURL = url + "?q=" + query + "&rows=1&page=1&output=json";
+  completeURL = url + "?q=" + query + "&" + filters + "&rows=10&page=1&output=json";
 
   request(completeURL, { json: true }, (err, res, body) => {
     if (err) {return console.log(err); }
-    console.log(body.response.docs);
+     callback(body.response.docs);
   })
 
 
@@ -85,5 +87,19 @@ function getShows(artist) {
 
 squeeze.on('register', function() {
   //  setAlbum("https://archive.org/download/vulfpeck2016-09-08.cmc621xt.sbd.matrix.flac24/vulfpeck2016-09-08.cmc621xt.sbd.matrix.flac24_vbr.m3u");
-  getShows("GratefulDead");
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  rl.question("Type an Artist: ", (artist) => {
+    getShows(artist, function(docs) {
+      console.log(docs[0].identifier);
+      setAlbum("https://archive.org/download/" + docs[0].identifier + "/" + docs[0].identifier + "_vbr.m3u");
+      rl.close();
+    });
+  });
+
 });
+
