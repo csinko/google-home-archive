@@ -77,6 +77,7 @@ function setAlbum(url) {
 }
 
 function getShow(artist, callback) {
+  console.log("Getting show by " + artist);
   url = "https://archive.org/advancedsearch.php"
   query = "collection:" + artist + " AND mediatype:etree";
   filters = "fl[]=identifier&fl[]=venue&fl[]=date&fl[]=year&fl[]=title&fl[]=creator"
@@ -91,7 +92,34 @@ function getShow(artist, callback) {
   })
 }
 
+function getShowByYear(artist, year, callback) {
+  console.log("Getting show by " + artist + " in " + year);
+  url = "https://archive.org/advancedsearch.php"
+  query = "collection:" + artist + " AND mediatype:etree AND year:" + year;
+  filters = "fl[]=identifier&fl[]=venue&fl[]=date&fl[]=year&fl[]=title&fl[]=creator"
+  sort = "sort[]=downloads desc"
+
+  completeURL = url + "?q=" + query + "&" + filters + "&" + sort + "&rows=10&page=1&output=json";
+
+  request(completeURL, { json: true }, (err, res, body) => {
+    if (err) {return console.log(err); }
+    var maxNum = 10;
+    if (body.response.numFound < 10) {
+      maxNum = body.response.numFound;
+    }
+    console.log("Max num is " + maxNum);
+
+    if (maxNum === 0) {
+      //No results found, exit
+      return undefined;
+    }
+    randomNum = Math.floor(Math.random() * Math.floor(10));
+     callback(body.response.docs[randomNum]);
+  })
+}
+
 function getNewestShow(artist, callback) {
+  console.log("Getting newest show by " + artist);
   url = "https://archive.org/advancedsearch.php"
   query = "collection:" + artist + " AND mediatype:etree";
   filters = "fl[]=identifier&fl[]=venue&fl[]=date&fl[]=year&fl[]=title&fl[]=creator"
@@ -127,6 +155,23 @@ app.post('/', function(req, res) {
       res.send('RESPONSE');
       return;
     } 
+
+    var year = req.body.result.parameters.year;
+    if (year.length != 0) {
+      getShowByYear(artist, year, function(doc) {
+        //If there isn't a result found, exit
+        if (typeof doc == 'undefined') {
+          res.send("FAILED");
+          return;
+        }
+
+        console.log(doc.creator + " - " + doc.date + " " + doc.venue);
+        setAlbum("https://archive.org/download/" + doc.identifier + "/" + doc.identifier + "_vbr.m3u");
+
+      });
+      res.send('RESPONSE');
+      return;
+    }
 
     //Grab a show
     getShow(artist, function(doc) {
