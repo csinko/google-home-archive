@@ -111,10 +111,12 @@ function getShowByYear(artist, year, callback) {
 
     if (maxNum === 0) {
       //No results found, exit
-      return undefined;
+      callback(undefined);
+      return;
     }
     randomNum = Math.floor(Math.random() * Math.floor(10));
      callback(body.response.docs[randomNum]);
+     return;
   })
 }
 
@@ -134,6 +136,9 @@ function getNewestShow(artist, callback) {
 }
 
 app.post('/', function(req, res) {
+  var callback = function(res, resJSON) {
+    res.json(resJSON);
+  }
   //Check which intent was triggered
   if(req.body.result.metadata.intentName === "Play Music") {
     //User is playing music, get artist and play
@@ -144,60 +149,63 @@ app.post('/', function(req, res) {
 
     //Check if should grab the latest show
     var isNew = req.body.result.parameters.new;
+    var year = req.body.result.parameters.year;
     if (isNew.length != 0) {
       //Newest show requested
       getNewestShow(artist, function(doc) {
         //Log some info about the show
         console.log(doc.creator + " - " + doc.date + " " + doc.venue);
         setAlbum("https://archive.org/download/" + doc.identifier + "/" + doc.identifier + "_vbr.m3u");
+      callback(res, {
+        speech: "Heres the newest " + doc.creator + " show.  Its recorded from " + doc.venue + "."
+      });
+      return;
 
       });
-      res.send('RESPONSE');
-      return;
     } 
-
-    var year = req.body.result.parameters.year;
-    if (year.length != 0) {
+    else if (year.length != 0) {
       getShowByYear(artist, year, function(doc) {
-        //If there isn't a result found, exit
+        //If there isn't a result found, prepare for failure
         if (typeof doc == 'undefined') {
-          res.send("FAILED");
+          callback(res, {
+            speech: "Eeek, looks like theres no shows for " + artist + " in " + year + "!  Try a different search.",
+            data: {
+              google: {
+                expect_user_response: true
+              }
+            }
+          });
           return;
         }
 
+        else {
         console.log(doc.creator + " - " + doc.date + " " + doc.venue);
         setAlbum("https://archive.org/download/" + doc.identifier + "/" + doc.identifier + "_vbr.m3u");
-
-      });
-      res.send('RESPONSE');
+        console.log("Returning JSON");
+        callback(res, {
+          speech: "Great!  I found a show by " + doc.creator + " at " + doc.venue + " in " + doc.year + ".  Enjoy!"
+        });
       return;
+        }
+      });
     }
-
-    //Grab a show
-    getShow(artist, function(doc) {
-      console.log(doc.creator + " - " + doc.date + " " + doc.venue);
-      setAlbum("https://archive.org/download/" + doc.identifier + "/" + doc.identifier + "_vbr.m3u");
-    });
+    else {
+      //Grab a show
+      getShow(artist, function(doc) {
+        console.log(doc.creator + " - " + doc.date + " " + doc.venue);
+        setAlbum("https://archive.org/download/" + doc.identifier + "/" + doc.identifier + "_vbr.m3u");
+        callback(res, {
+          speech: "Check out this " + doc.creator + " show from " + doc.year + " played at " + doc.venue
+        });
+    return;
+      });
+    }
   }
-  res.send('RESPONSE');
 });
 
 
 squeeze.on('register', function() {
 
-  //  const rl = readline.createInterface({
-  //    input: process.stdin,
-  //    output: process.stdout
-  //  });
-  //
-  //  rl.question("Type an Artist: ", (artist) => {
-  //    getShows(artist, function(docs) {
-  //      console.log(docs[0].identifier);
-  //      setAlbum("https://archive.org/download/" + docs[0].identifier + "/" + docs[0].identifier + "_vbr.m3u");
-  //      rl.close();
-  //    });
-  //  });
-  //
 
 
   app.listen(port);
